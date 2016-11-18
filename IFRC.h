@@ -18,6 +18,7 @@ class IFRC
     IFRC(); // Ao instanciar objeto da classe inicializa os motores
     void testarMotores(); // Realiza teste para verificar se os motores estao funcionando (teste apenas visual)
     void velocidadeMedia(); // Experimento de velocidade media
+    void velocidadeVariada(); // Experimento de velocidade uniformemente variada
     void processarComandos(); // Processamento de requisicoes
 };
 

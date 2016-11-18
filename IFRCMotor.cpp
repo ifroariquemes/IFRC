@@ -11,9 +11,9 @@ IFRCMotor::IFRCMotor(int pinoMA, int pinoMB, int pinoMV){
 
 uint8_t IFRCMotor::velocidadeParaTensao(int v) {
   if(v < V_MIN || v > V_MAX) {              // Valida se a velocidade esta dentro dos
-    Serial.print("$Velocidade mínima = ");  // limites fisicos de movimentacao do carro
+    Serial.print("$Velocidade minima = ");  // limites fisicos de movimentacao do carro
     Serial.print(V_MIN);
-    Serial.print(", máxima = ");
+    Serial.print(", maxima = ");
     Serial.println(V_MAX);
     return 0;
   }
