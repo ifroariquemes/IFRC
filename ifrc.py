@@ -72,7 +72,7 @@ class IFRC:
 			cmdT = raw_input("Tempo em segundos [1 - {0}]: ".format(self.tempoMaximo));
 			if self.validarVelocidade(cmdV, cmdT):
 				self.enviarComandoVM(cmdV, cmdT)
-				self.escutarRespostaVM(int(cmdT))
+				self.escutarRespostaVM(int(cmdV), int(cmdT))
 			raw_input("\nPressione ENTER para continuar...")	
 		
 	def velocidadeVariada(self):	
@@ -124,17 +124,15 @@ class IFRC:
 		del self.variacaoTempo[:]
 		del self.variacaoVelocidade[:]
 		while i <= cmdT: 
-			dadosRecebidos = self.dispositivo.recv(BUFFER_SIZE)
-			if (dadosRecebidos != ""):
-				dadosProcessados = dadosRecebidos.split(",")
-				v = float(dadosProcessados[0])
-				t = float(dadosProcessados[1])
-				deltaD = (cmdV * t) + (cmdA * pow(t, 2) / 2)
-				print 'Velocidade: {0} cm/s, Tempo: {1} s, Distancia percorrida: {2} cm'.format(str(v), str(t), str(deltaD))
-				self.variacaoTempo.append(t)
-				self.variacaoDistancia.append(deltaD)
-				self.variacaoVelocidade.append(v)
-				i += 1
+			v = float(cmdV + (cmdA * i))
+			t = float(i)
+			deltaD = (cmdV * t) + (cmdA * pow(t, 2) / 2)
+			print 'Velocidade: {0} cm/s, Tempo: {1} s, Distancia percorrida: {2} cm'.format(str(v), str(t), str(deltaD))
+			self.variacaoTempo.append(t)
+			self.variacaoDistancia.append(deltaD)
+			self.variacaoVelocidade.append(v)
+			i += 1
+			time.sleep(1)
 		self.velocidadeMedia = deltaD / t
 		self.aceleracao = self.variacaoVelocidade[1] - self.variacaoVelocidade[0]
 		self.gerarGraficoVM()
@@ -152,24 +150,22 @@ class IFRC:
 	def enviarComandoVM(self, v, t):
 		self.dispositivo.send(str.encode("V{0},{1}".format(str(t).zfill(2),v)))
 		
-	def escutarRespostaVM(self, cmdT):
+	def escutarRespostaVM(self, cmdV, cmdT):
 		i = 0; t = 0; deltaD = 0; v = 0;
 		del self.variacaoDistancia[:]
 		del self.variacaoTempo[:]
 		del self.variacaoVelocidade[:]
 		while i <= cmdT: 
-			dadosRecebidos = self.dispositivo.recv(BUFFER_SIZE)
-			if (dadosRecebidos != ""):
-				dadosProcessados = dadosRecebidos.split(",")
-				v = float(dadosProcessados[0])
-				t = float(dadosProcessados[1])
-				if t != 0:
-					deltaD += v
-				print 'Velocidade: {0} cm/s, Tempo: {1} s, Distancia percorrida: {2} cm'.format(str(v), str(t), str(deltaD))
-				self.variacaoTempo.append(t)
-				self.variacaoDistancia.append(deltaD)
-				self.variacaoVelocidade.append(v)
-				i += 1
+			v = float(cmdV)
+			t = float(i)
+			if t != 0:
+				deltaD += v
+			print 'Velocidade: {0} cm/s, Tempo: {1} s, Distancia percorrida: {2} cm'.format(str(v), str(t), str(deltaD))
+			self.variacaoTempo.append(t)
+			self.variacaoDistancia.append(deltaD)
+			self.variacaoVelocidade.append(v)
+			i += 1
+			time.sleep(1)
 		self.velocidadeMedia = deltaD / t
 		self.gerarGraficoVM()
 		
