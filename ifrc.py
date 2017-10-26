@@ -1,20 +1,26 @@
+#!/usr/bin/env python
 """
 Projeto de pesquisa do mestrado de H. S. Oliveira, tambem registrado no 
 Instituto Federal de Rondonia - Campus Ariquemes. Este codigo controla 
 um carro robo feito em Arduino com objetivo de promover um experimento 
 didatico no ensino do Movimento Retilineo Uniformemente Variado (MRUV).
-A comunicacao e feita atraves de um modulo bluetooth. O usuario 
+A comunicacao e feita atraves de um modulo WiFi. O usuario 
 seleciona a porta de comunicacao com o carro e entao utiliza as funcoes 
 para realizar demonstracoes em sala de aula.
+
+Python 2.7
 """
+import socket
 import time
-import serial
-import serial.tools.list_ports
 from cursesmenu import *
 from cursesmenu.items import *
 import unicodedata
 import plotly 
 from plotly.graph_objs import Scatter, Layout
+
+TCP_IP = '192.168.4.1'
+TCP_PORT = 9000
+BUFFER_SIZE = 1024
 
 class IFRCMenu:
 	"""
@@ -24,39 +30,14 @@ class IFRCMenu:
 		self.ifrc = IFRC()
 		titulo = " IFRC: Carro robo para Ensino de Fisica - Instituto Federal de Rondonia - Campus Ariquemes (v1.0.0)"
 		self.menuPrincipal = CursesMenu(titulo, "H. S. Oliveira <heleno.oliveira@ifro.edu.br> e N. A. V. Simoes <natanael.simoes@ifro.edu.br>", False)
-		self.menuPortas = CursesMenu(titulo, "Selecione a porta onde o carro esta conectado", False)
-		self.criarItensPortas()
-		self.menuPrincipal.append_item(SubmenuItem("Selecionar porta de comunicacao", self.menuPortas, self.menuPrincipal))
 		self.menuPrincipal.append_item(FunctionItem("Movimento Retilineo Uniforme", self.ifrc.velocidadeMedia))
 		self.menuPrincipal.append_item(FunctionItem("Movimento Retilineo Uniformemente Variada", self.ifrc.velocidadeVariada))
 		self.menuPrincipal.append_item(ExitItem("Sair"))
 		self.menuPrincipal.show()
-	
-	def criarItensPortas(self):
-		itens = []
-		for ser in self.ifrc.listarPortas():
-			nome = "{0} - {1}".format(ser.device, strip_accents(ser.description[0:-6]))
-			self.menuPortas.append_item(FunctionItem(nome, self.selecionarPorta, [ser.device]))
-		self.menuPortas.append_item(ExitItem("Voltar", self.menuPortas))	
-		
-	def selecionarPorta(self, porta):
-		print("Tentativa de comunicacao com o carro na porta {0}...".format(porta))
-		try:
-			self.ifrc.selecionarPorta(porta)
-			print("Carro conectado! Pressione ENTER para continuar...")
-			input()
-		except:
-			print("O carro nao esta conectado nesta porta, pressione ENTER para continuar...")
-			input()
-		if self.ifrc.conectado:
-				self.menuPrincipal.selected_item.text = "Selecionar porta de comunicacao (Conectado em {0})".format(porta)
-				self.menuPortas.exit()
-		else:
-			self.menuPrincipal.selected_item.text = "Selecionar porta de comunicacao"
 		
 class IFRC:
 	"""
-	Esta classe realiza o controle da porta serial para comunicar com o carro
+	Esta classe realiza o controle da socket TCP para comunicar com o carro
 	"""
 	velocidadeMinima = 17
 	velocidadeMaxima = 71
@@ -65,53 +46,44 @@ class IFRC:
 	def __init__(self):
 		self.porta = ''
 		self.dispositivo = None
-		self.velocidadeSerial = 9600
 		self.conectado = False
 		self.velocidadeSerialMedia = 0
 		self.variacaoTempo = []
 		self.variacaoDistancia = []
 		self.variacaoVelocidade = []
 		self.aceleracao = 0
-		
-	def listarPortas(self):
-		return serial.tools.list_ports.comports()		
-		
-	def selecionarPorta(self, porta):
-		self.conectado = False
-		self.dispositivo = serial.Serial(porta, self.velocidadeSerial, timeout=1, write_timeout=1)
-		self.dispositivo.write(str.encode("T"))
-		resposta = ""
-		while(resposta == ""):
-			resposta = str(self.dispositivo.readline())[2:-5]
-		self.conectado = True
-		return True
+		self.criarConexao()
+	
+	def __del__(self):
+		self.dispositivo.close()
+	
+	def criarConexao(self):
+		try:
+			self.dispositivo = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			self.dispositivo.connect((TCP_IP, TCP_PORT))
+			self.conectado = True
+		except:
+			print "Conexao com o carro nao foi estabelecida."
+			exit()
 		
 	def velocidadeMedia(self):
-		if self.conectado:
-			cmdV = input("Velocidade em cm/s [{0} - {1}, 0 para cancelar]: ".format(self.velocidadeMinima, self.velocidadeMaxima))
-			if cmdV != '0':
-				cmdT = input("Tempo em segundos [1 - {0}]: ".format(self.tempoMaximo));
-				if self.validarVelocidade(cmdV, cmdT):
-					self.enviarComandoVM(cmdV, cmdT)
-					self.escutarRespostaVM(int(cmdT))
-				input("\nPressione ENTER para continuar...")
-		else:
-			print("Conexao com o carro nao foi inicializada, selecione uma porta de comunicacao.")
-			input("\nPressione ENTER para continuar...")
-	
-	def velocidadeVariada(self):
-		if self.conectado:
-			cmdV = input("Velocidade em cm/s [{0} - {1}, 0 para cancelar]: ".format(self.velocidadeMinima, self.velocidadeMaxima))
-			if cmdV != '0':
-				cmdA = input("Aceleração em cm/s²: ")
-				cmdT = input("Tempo em segundos [1 - {0}]: ".format(self.tempoMaximo));
-				if self.validarAceleracao(cmdV, cmdT, cmdA):
-					self.enviarComandoVV(cmdV, cmdA, cmdT)
-					self.escutarRespostaVV(int(cmdT), int(cmdA), int(cmdV))
-				input("\nPressione ENTER para continuar...")
-		else:
-			print("Conexao com o carro nao foi inicializada, selecione uma porta de comunicacao.")
-			input("\nPressione ENTER para continuar...")
+		cmdV = raw_input("Velocidade em cm/s [{0} - {1}, 0 para cancelar]: ".format(self.velocidadeMinima, self.velocidadeMaxima))
+		if cmdV != "0":	
+			cmdT = raw_input("Tempo em segundos [1 - {0}]: ".format(self.tempoMaximo));
+			if self.validarVelocidade(cmdV, cmdT):
+				self.enviarComandoVM(cmdV, cmdT)
+				self.escutarRespostaVM(int(cmdT))
+			raw_input("\nPressione ENTER para continuar...")	
+		
+	def velocidadeVariada(self):	
+		cmdV = raw_input("Velocidade em cm/s [{0} - {1}, 0 para cancelar]: ".format(self.velocidadeMinima, self.velocidadeMaxima))
+		if cmdV != '0':
+			cmdA = raw_input("Aceleracao em cm/s2: ")
+			cmdT = raw_input("Tempo em segundos [1 - {0}]: ".format(self.tempoMaximo));
+			if self.validarAceleracao(cmdV, cmdT, cmdA):
+				self.enviarComandoVV(cmdV, cmdA, cmdT)
+				self.escutarRespostaVV(int(cmdT), int(cmdA), int(cmdV))
+			raw_input("\nPressione ENTER para continuar...")
 			
 	def validarVelocidade(self, v, t):
 		try:
@@ -144,22 +116,22 @@ class IFRC:
 			return False
 	
 	def enviarComandoVV(self, v, a, t):
-		self.dispositivo.write(str.encode("A{0},{1},{2}".format(t.zfill(2),v,a.zfill(2))))
+		self.dispositivo.send(str.encode("A{0},{1},{2}".format(str(t).zfill(2),v,str(a).zfill(2))))
 		time.sleep(0.5) # tempo para aguardar processamento
 	
 	def escutarRespostaVV(self, cmdT, cmdA, cmdV):
 		i = 0; t = 0; deltaD = 0; v = 0;
-		self.variacaoDistancia.clear()
-		self.variacaoTempo.clear()
-		self.variacaoVelocidade.clear()
+		del self.variacaoDistancia[:]
+		del self.variacaoTempo[:]
+		del self.variacaoVelocidade[:]
 		while i <= cmdT: 
-			dadosRecebidos = str(self.dispositivo.readline())[2:-5]
+			dadosRecebidos = self.dispositivo.recv(BUFFER_SIZE)
 			if (dadosRecebidos != ""):
 				dadosProcessados = dadosRecebidos.split(",")
 				v = float(dadosProcessados[0])
 				t = float(dadosProcessados[1])
 				deltaD = (cmdV * t) + (cmdA * pow(t, 2) / 2)
-				print("Velocidade: ", str(v), " cm/s, Tempo: ", str(t), "s, Distancia percorrida: ", str(deltaD), "cm")
+				print 'Velocidade: {0} cm/s, Tempo: {1} s, Distancia percorrida: {2} cm'.format(str(v), str(t), str(deltaD))
 				self.variacaoTempo.append(t)
 				self.variacaoDistancia.append(deltaD)
 				self.variacaoVelocidade.append(v)
@@ -180,23 +152,23 @@ class IFRC:
 		}, filename="mruv.html")
 	
 	def enviarComandoVM(self, v, t):
-		self.dispositivo.write(str.encode("V{0},{1}".format(t.zfill(2),v)))
+		self.dispositivo.send(str.encode("V{0},{1}".format(str(t).zfill(2),v)))
 		time.sleep(0.5) # tempo para aguardar processamento
 		
 	def escutarRespostaVM(self, cmdT):
 		i = 0; t = 0; deltaD = 0; v = 0;
-		self.variacaoDistancia.clear()
-		self.variacaoTempo.clear()
-		self.variacaoVelocidade.clear()
+		del self.variacaoDistancia[:]
+		del self.variacaoTempo[:]
+		del self.variacaoVelocidade[:]
 		while i <= cmdT: 
-			dadosRecebidos = str(self.dispositivo.readline())[2:-5]
+			dadosRecebidos = self.dispositivo.recv(BUFFER_SIZE)
 			if (dadosRecebidos != ""):
 				dadosProcessados = dadosRecebidos.split(",")
 				v = float(dadosProcessados[0])
 				t = float(dadosProcessados[1])
 				if t != 0:
 					deltaD += v
-				print("Velocidade: ", str(v), " cm/s, Tempo: ", str(t), "s, Distancia percorrida: ", str(deltaD), "cm")
+				print 'Velocidade: {0} cm/s, Tempo: {1} s, Distancia percorrida: {2} cm'.format(str(v), str(t), str(deltaD))
 				self.variacaoTempo.append(t)
 				self.variacaoDistancia.append(deltaD)
 				self.variacaoVelocidade.append(v)
