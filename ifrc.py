@@ -117,7 +117,6 @@ class IFRC:
 	
 	def enviarComandoVV(self, v, a, t):
 		self.dispositivo.send(str.encode("A{0},{1},{2}".format(str(t).zfill(2),v,str(a).zfill(2))))
-		time.sleep(0.5) # tempo para aguardar processamento
 	
 	def escutarRespostaVV(self, cmdT, cmdA, cmdV):
 		i = 0; t = 0; deltaD = 0; v = 0;
@@ -136,7 +135,6 @@ class IFRC:
 				self.variacaoDistancia.append(deltaD)
 				self.variacaoVelocidade.append(v)
 				i += 1
-			time.sleep(1) # aguardando chegar mais respostas
 		self.velocidadeMedia = deltaD / t
 		self.aceleracao = self.variacaoVelocidade[1] - self.variacaoVelocidade[0]
 		self.gerarGraficoVM()
@@ -153,7 +151,6 @@ class IFRC:
 	
 	def enviarComandoVM(self, v, t):
 		self.dispositivo.send(str.encode("V{0},{1}".format(str(t).zfill(2),v)))
-		time.sleep(0.5) # tempo para aguardar processamento
 		
 	def escutarRespostaVM(self, cmdT):
 		i = 0; t = 0; deltaD = 0; v = 0;
@@ -173,7 +170,6 @@ class IFRC:
 				self.variacaoDistancia.append(deltaD)
 				self.variacaoVelocidade.append(v)
 				i += 1
-			time.sleep(1) # aguardando chegar mais respostas
 		self.velocidadeMedia = deltaD / t
 		self.gerarGraficoVM()
 		
